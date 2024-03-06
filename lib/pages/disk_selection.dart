@@ -1,0 +1,247 @@
+import 'package:dbus/dbus.dart';
+import 'package:flutter/material.dart';
+import 'package:yaru_widgets/yaru_widgets.dart';
+import 'package:async/async.dart';
+import 'package:ubuntu_wizard/ubuntu_wizard.dart';
+import 'dart:async';
+
+const int minimumRequiredDiskSize = 12 << 30;
+
+class Drive {
+  final String name;
+  final String id;
+  final int size;
+  final String devicePath;
+  final DBusObjectPath driveObjectPath, blockDeviceObjectPath;
+
+  Drive(this.name, this.id, this.size, this.devicePath, this.driveObjectPath,
+      this.blockDeviceObjectPath);
+
+  @override
+  toString() => name;
+}
+
+class SelectRemovableMedia extends StatefulWidget {
+  const SelectRemovableMedia({super.key});
+
+  @override
+  State<SelectRemovableMedia> createState() => _SelectRemovableMediaState();
+}
+
+class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
+  List<Drive> drives = [];
+  final _dbusClient = DBusClient.system();
+  Timer? _debounce;
+  late StreamSubscription<DBusSignal> _subscription;
+  String? _selectedDrive;
+
+  _onDrivesChanged() async {
+    if (_debounce?.isActive ?? false) {
+      _debounce?.cancel();
+    }
+    _debounce = Timer(const Duration(milliseconds: 100), () async {
+      List<Drive> newDrives = await _getListOfDrives();
+      _clearUnavailableSelectedDrive(newDrives);
+      setState(() {
+        drives = newDrives;
+      });
+    });
+  }
+
+  Future<List<Drive>> _getListOfDrives() async {
+    final blockDevicesObject = DBusRemoteObject(_dbusClient,
+        name: 'org.freedesktop.UDisks2',
+        path: DBusObjectPath('/org/freedesktop/UDisks2/block_devices'));
+    DBusIntrospectNode introspect = await blockDevicesObject.introspect();
+
+    // map of blockDeviceObjectPath: driveObjectPath
+    Map<DBusObjectPath, DBusObjectPath> blockDevs = {};
+
+    // iterate through block devices, to find out devices that
+    // 1. has a Drive backing it
+    // 2. has enough Size (we assume 16G)
+    // 3. its HintPartitionable is true
+    for (final node in introspect.children) {
+      final blockDeviceObjectPath =
+          DBusObjectPath('/org/freedesktop/UDisks2/block_devices/${node.name}');
+      final blockDeviceObject = DBusRemoteObject(_dbusClient,
+          name: 'org.freedesktop.UDisks2', path: blockDeviceObjectPath);
+
+      final drive = await blockDeviceObject.getProperty(
+          'org.freedesktop.UDisks2.Block', 'Drive',
+          signature: DBusSignature('o'));
+      final driveObjectPath = drive.asObjectPath();
+      if (driveObjectPath == DBusObjectPath.root) {
+        continue;
+      }
+
+      final size = await blockDeviceObject.getProperty(
+          'org.freedesktop.UDisks2.Block', 'Size',
+          signature: DBusSignature('t'));
+      if (size.asUint64() < minimumRequiredDiskSize) {
+        continue;
+      }
+
+      final hintPartitionable = await blockDeviceObject.getProperty(
+          'org.freedesktop.UDisks2.Block', 'HintPartitionable',
+          signature: DBusSignature('b'));
+      if (hintPartitionable.asBoolean() == false) {
+        continue;
+      }
+
+      blockDevs[blockDeviceObjectPath] = driveObjectPath;
+    }
+
+    // iterate through block devices' partition table, to find out devices that
+    // no PartitionTable is mentioning, this should get all root block devs of
+    // the drive, and drives without partition tables are represented as well
+    for (final node in introspect.children) {
+      final blockDeviceObjectPath =
+          DBusObjectPath('/org/freedesktop/UDisks2/block_devices/${node.name}');
+      final blockDeviceObject = DBusRemoteObject(_dbusClient,
+          name: 'org.freedesktop.UDisks2', path: blockDeviceObjectPath);
+
+      try {
+        final partitions = await blockDeviceObject.getProperty(
+            'org.freedesktop.UDisks2.PartitionTable', 'Partitions',
+            signature: DBusSignature('ao'));
+        for (final partition in partitions.asObjectPathArray()) {
+          blockDevs.remove(partition);
+        }
+      } on DBusInvalidArgsException {
+        // partition table might not be in the block device
+        continue;
+      }
+    }
+
+    // finally we got a list of drives, find those who's ConnectionBus is "usb",
+    // or is MediaRemovable, since USB NVMe drives does not show MediaRemovable
+    List<Drive> drives = [];
+    for (final entry in blockDevs.entries) {
+      final blockDeviceObjectPath = entry.key;
+      final driveObjectPath = entry.value;
+
+      final driveObject = DBusRemoteObject(_dbusClient,
+          name: 'org.freedesktop.UDisks2', path: driveObjectPath);
+      final connectionBus = await driveObject.getProperty(
+          'org.freedesktop.UDisks2.Drive', 'ConnectionBus',
+          signature: DBusSignature('s'));
+      final mediaRemovable = await driveObject.getProperty(
+          'org.freedesktop.UDisks2.Drive', 'MediaRemovable',
+          signature: DBusSignature('b'));
+
+      if (!(connectionBus.asString() == 'usb' || mediaRemovable.asBoolean())) {
+        continue;
+      }
+
+      final blockDeviceObject = DBusRemoteObject(_dbusClient,
+          name: 'org.freedesktop.UDisks2', path: blockDeviceObjectPath);
+      final id = await driveObject.getProperty(
+          'org.freedesktop.UDisks2.Drive', 'Id',
+          signature: DBusSignature('s'));
+      final vendor = await driveObject.getProperty(
+          'org.freedesktop.UDisks2.Drive', 'Vendor',
+          signature: DBusSignature('s'));
+      final model = await driveObject.getProperty(
+          'org.freedesktop.UDisks2.Drive', 'Model',
+          signature: DBusSignature('s'));
+      final size = await driveObject.getProperty(
+          'org.freedesktop.UDisks2.Drive', 'Size',
+          signature: DBusSignature('t'));
+      final devicePath = await blockDeviceObject.getProperty(
+          'org.freedesktop.UDisks2.Block', 'Device',
+          signature: DBusSignature('ay'));
+      drives.add(Drive(
+          '${vendor.asString()} ${model.asString()}'.trim(),
+          id.asString(),
+          size.asUint64(),
+          String.fromCharCodes(devicePath.asByteArray(), 0, 128),
+          driveObjectPath,
+          blockDeviceObjectPath));
+    }
+    drives.sort((a, b) => a.id.compareTo(b.id));
+    return drives;
+  }
+
+  _clearUnavailableSelectedDrive(List<Drive> drives) {
+    for (Drive drive in drives) {
+      if (drive.id == _selectedDrive) {
+        return;
+      }
+    }
+    _selectedDrive = null;
+  }
+
+  @override
+  initState() {
+    super.initState();
+
+    final object = DBusRemoteObject(_dbusClient,
+        name: 'org.freedesktop.UDisks2',
+        path: DBusObjectPath('/org/freedesktop/UDisks2'));
+
+    final addedStream = DBusRemoteObjectSignalStream(
+        object: object,
+        interface: 'org.freedesktop.DBus.ObjectManager',
+        name: 'InterfacesAdded');
+    final removedStream = DBusRemoteObjectSignalStream(
+        object: object,
+        interface: 'org.freedesktop.DBus.ObjectManager',
+        name: 'InterfacesRemoved');
+    _subscription = StreamGroup.merge([addedStream, removedStream])
+        .listen((_) => _onDrivesChanged());
+
+    _onDrivesChanged();
+  }
+
+  @override
+  void deactivate() {
+    _subscription.cancel();
+    super.deactivate();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    List<Widget> drivesWidgets = [
+      const ListTile(
+        title: Text("No removable storage is detected"),
+        subtitle:
+            Text("You need a USB storage to create a Factory Reset Media."),
+      )
+    ];
+    if (drives.isNotEmpty) {
+      drivesWidgets = drives.map((drive) {
+        double sizeInGiB = drive.size.toDouble() / (1 << 30).toDouble();
+        String sizeString = '${sizeInGiB.toStringAsFixed(1)} GiB';
+        return RadioListTile<String>(
+          key: Key(drive.id),
+          value: drive.id,
+          groupValue: _selectedDrive,
+          onChanged: (String? value) => setState(() => _selectedDrive = value),
+          title: Text(drive.name),
+          subtitle: Text('${drive.devicePath} $sizeString'),
+        );
+      }).toList();
+    }
+
+    return WizardPage(
+        title: const YaruWindowTitleBar(title: Text("Factory Reset Tool")),
+        header: const Text("Select a disk to create a Factory Reset Media:"),
+        content: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: drivesWidgets,
+        ),
+        bottomBar: WizardBar(
+            leading: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text("Back")),
+            trailing: [
+              NextWizardButton(
+                enabled: _selectedDrive != null,
+                highlighted: true,
+              )
+            ]));
+  }
+}
