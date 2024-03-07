@@ -208,8 +208,7 @@ Stream<double> copyPercentageUpdate(
     double newPercent = completed / total;
     if (newPercent > 1) {
       percent = 1;
-    }
-    if (newPercent > percent) {
+    } else if (newPercent > percent) {
       percent = newPercent;
     }
     yield percent;
