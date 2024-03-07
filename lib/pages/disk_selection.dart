@@ -1,4 +1,5 @@
 import 'package:dbus/dbus.dart';
+import 'package:factory_reset_tools/reset_media.dart';
 import 'package:flutter/material.dart';
 import 'package:yaru_widgets/yaru_widgets.dart';
 import 'package:async/async.dart';
@@ -151,11 +152,16 @@ class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
       final devicePath = await blockDeviceObject.getProperty(
           'org.freedesktop.UDisks2.Block', 'Device',
           signature: DBusSignature('ay'));
+      // Note that Device property is an array of unsigned bytes, containing
+      // null-terminated C-style string, therefore needs to filter out 0 from
+      // the byte array.
+      final devicePathString = String.fromCharCodes(
+          devicePath.asByteArray().where((e) => e != 0), 0, 128);
       drives.add(Drive(
           '${vendor.asString()} ${model.asString()}'.trim(),
           id.asString(),
           size.asUint64(),
-          String.fromCharCodes(devicePath.asByteArray(), 0, 128),
+          devicePathString,
           driveObjectPath,
           blockDeviceObjectPath));
     }
@@ -241,6 +247,17 @@ class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
               NextWizardButton(
                 enabled: _selectedDrive != null,
                 highlighted: true,
+                onExecute: () async {
+                  // TODO: switch to next page
+                  final devicePath = drives
+                      .firstWhere((drive) => drive.id == _selectedDrive)
+                      .devicePath;
+                  final stream = createResetMedia(devicePath);
+                  await for (final status in stream) {
+                    print(
+                        "${status.status} ${status.progress} ${status.reason ?? ""}");
+                  }
+                },
               )
             ]));
   }
