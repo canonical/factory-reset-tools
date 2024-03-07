@@ -248,7 +248,6 @@ class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
                 enabled: _selectedDrive != null,
                 highlighted: true,
                 onExecute: () async {
-                  // TODO: switch to next page
                   final devicePath = drives
                       .firstWhere((drive) => drive.id == _selectedDrive)
                       .devicePath;
@@ -274,7 +273,6 @@ class _CreateResetMediaState extends State<CreateResetMedia> {
   double progressValue = 0;
 
   onStatusChanged(ResetMediaCreationProgress progress) {
-    print(progress);
     setState(() {
       progressText = progress.status.name;
       progressValue = progress.progress!;
