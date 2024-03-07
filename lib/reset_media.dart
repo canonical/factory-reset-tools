@@ -212,7 +212,7 @@ Stream<double> copyPercentageUpdate(
       percent = newPercent;
     }
     yield percent;
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 100));
   }
 }
 
