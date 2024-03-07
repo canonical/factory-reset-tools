@@ -252,13 +252,72 @@ class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
                   final devicePath = drives
                       .firstWhere((drive) => drive.id == _selectedDrive)
                       .devicePath;
-                  final stream = createResetMedia(devicePath);
-                  await for (final status in stream) {
-                    print(
-                        "${status.status} ${status.progress} ${status.reason ?? ""}");
-                  }
+                  Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => CreateResetMedia(devicePath)));
                 },
               )
             ]));
   }
+}
+
+class CreateResetMedia extends StatefulWidget {
+  const CreateResetMedia(this.devicePath, {super.key});
+  final String devicePath;
+
+  @override
+  State<CreateResetMedia> createState() => _CreateResetMediaState();
+}
+
+class _CreateResetMediaState extends State<CreateResetMedia> {
+  Stream<ResetMediaCreationProgress>? createResetMediaAsyncStream;
+  String progressText = "";
+  double progressValue = 0;
+
+  onStatusChanged(ResetMediaCreationProgress progress) {
+    print(progress);
+    setState(() {
+      progressText = progress.status.name;
+      progressValue = progress.progress!;
+    });
+  }
+
+  @override
+  initState() {
+    super.initState();
+    createResetMediaAsyncStream ??= dummyCreateResetMedia(widget.devicePath);
+    createResetMediaAsyncStream!.listen(onStatusChanged);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WizardPage(
+        title: const YaruWindowTitleBar(title: Text("Factory Reset Tool")),
+        header: const Text("Creating reset media..."),
+        content: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            LinearProgressIndicator(value: progressValue),
+            Text(progressText),
+          ],
+        ));
+  }
+}
+
+Stream<ResetMediaCreationProgress> dummyCreateResetMedia(
+    String targetDevicePath) async* {
+  yield ResetMediaCreationProgress(
+      ResetMediaCreationStatus.initializing, 0, null);
+
+  await Future.delayed(const Duration(seconds: 3));
+
+  for (double i = 0; i < 1; i += 0.01) {
+    yield ResetMediaCreationProgress(ResetMediaCreationStatus.copying, i, null);
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  yield ResetMediaCreationProgress(
+      ResetMediaCreationStatus.finalizing, 1, null);
+  await Future.delayed(const Duration(seconds: 3));
+
+  yield ResetMediaCreationProgress(ResetMediaCreationStatus.finished, 1, null);
 }
