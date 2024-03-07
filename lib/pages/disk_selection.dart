@@ -33,7 +33,7 @@ class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
   List<Drive> drives = [];
   final _dbusClient = DBusClient.system();
   Timer? _debounce;
-  late StreamSubscription<DBusSignal> _subscription;
+  StreamSubscription<DBusSignal>? _subscription;
   String? _selectedDrive;
 
   _onDrivesChanged() async {
@@ -194,7 +194,7 @@ class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
         object: object,
         interface: 'org.freedesktop.DBus.ObjectManager',
         name: 'InterfacesRemoved');
-    _subscription = StreamGroup.merge([addedStream, removedStream])
+    _subscription ??= StreamGroup.merge([addedStream, removedStream])
         .listen((_) => _onDrivesChanged());
 
     _onDrivesChanged();
@@ -202,7 +202,7 @@ class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
 
   @override
   void deactivate() {
-    _subscription.cancel();
+    _subscription!.cancel();
     super.deactivate();
   }
 
