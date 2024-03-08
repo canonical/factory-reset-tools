@@ -1,0 +1,28 @@
+name: factory-reset-tools
+version: '1.0'
+summary: Factory Reset Tools
+description: |
+  A tool to create reset media and reboot into factory reset menu, for Ubuntu-preinstalled systems.
+
+base: core22
+confinement: devmode
+grade: stable
+
+apps:
+  factory-reset-tools:
+    command: factory-reset-tools
+    extensions: [gnome]
+
+parts:
+  factory-reset-tools:
+    source: .
+    plugin: flutter
+    flutter-target: lib/main.dart
+    stage-packages:
+      - rsync
+
+plugs:
+  dbus-udisks2:
+    inteface: dbus
+    bus: system
+    name: org.freedesktop.UDisks2
