@@ -115,7 +115,7 @@ class Partition {
         'org.freedesktop.UDisks2.Filesystem',
         'Mount',
         [
-          DBusDict.stringVariant({"options": const DBusString("noatime")}),
+          DBusDict.stringVariant({}),
         ],
         replySignature: DBusSignature.string);
     var resultPath = result.returnValues[0].asString();
@@ -124,7 +124,8 @@ class Partition {
   }
 
   Future<void> unmount() async {
-    await retry(
+    const retryRunner = RetryOptions(maxAttempts: 5);
+    await retryRunner.retry(
       () => object.callMethod('org.freedesktop.UDisks2.Filesystem', 'Unmount',
           [DBusDict.stringVariant({})]),
       retryIf: (e) =>
