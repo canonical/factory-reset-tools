@@ -45,6 +45,7 @@ dependencies:
   intl: any # Use the pinned version from flutter_localizations
   ubuntu_localizations: ^0.3.5
   yaml: ^3.1.2
+  retry: ^3.1.2
 
 dev_dependencies:
   flutter_test:

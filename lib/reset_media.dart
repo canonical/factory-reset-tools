@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:async/async.dart';
 import 'package:dbus/dbus.dart';
+import 'package:retry/retry.dart';
 
 const fsuuidFilePathDefault = "/etc/reset_partition_fsuuid";
 
@@ -14,9 +15,9 @@ enum ResetMediaCreationStatus {
 
 class ResetMediaCreationProgress {
   final ResetMediaCreationStatus status;
-  final double? progress;
-  final String? reason;
-  ResetMediaCreationProgress(this.status, this.progress, this.reason);
+  final double? percent;
+  final String? errMsg;
+  ResetMediaCreationProgress(this.status, this.percent, this.errMsg);
 }
 
 class Drive {
@@ -62,7 +63,11 @@ class Drive {
       for (final partitionObjectPath in partitions.asObjectPathArray()) {
         final partition = Partition(DBusRemoteObject(dbusClient,
             name: 'org.freedesktop.UDisks2', path: partitionObjectPath));
-        await partition.unmount();
+        try {
+          await partition.unmount();
+        } on DBusErrorException {
+          // Partition might not have filesystem, or is already unmounted
+        }
         await partition.delete();
       }
     } on DBusInvalidArgsException {
@@ -110,7 +115,7 @@ class Partition {
         'org.freedesktop.UDisks2.Filesystem',
         'Mount',
         [
-          DBusDict.stringVariant({}),
+          DBusDict.stringVariant({"options": const DBusString("noatime")}),
         ],
         replySignature: DBusSignature.string);
     var resultPath = result.returnValues[0].asString();
@@ -119,8 +124,13 @@ class Partition {
   }
 
   Future<void> unmount() async {
-    await object.callMethod('org.freedesktop.UDisks2.Filesystem', 'Unmount',
-        [DBusDict.stringVariant({})]);
+    await retry(
+      () => object.callMethod('org.freedesktop.UDisks2.Filesystem', 'Unmount',
+          [DBusDict.stringVariant({})]),
+      retryIf: (e) =>
+          e is DBusMethodResponseException &&
+          e.errorName == "org.freedesktop.UDisks2.Error.DeviceBusy",
+    );
   }
 
   Future<void> delete() async {
@@ -189,13 +199,6 @@ Future<int?> getFsUsedSize(String devicePath) async {
   return int.tryParse(process.stdout as String);
 }
 
-Future<int> getDirtyWrite() async {
-  final process = await Process.run("grep", ["-e", "Dirty:", "/proc/meminfo"]);
-  final dirtyKB = int.parse(RegExp(r"\d+").firstMatch(process.stdout)![0]!);
-  final dirty = dirtyKB << 10;
-  return dirty;
-}
-
 Stream<double> copyPercentageUpdate(
     Partition resetPartition, targetPartition) async* {
   final int total = (await getFsUsedSize(await resetPartition.devicePath()))!;
@@ -203,9 +206,7 @@ Stream<double> copyPercentageUpdate(
   double percent = 0;
   while (true) {
     used = (await getFsUsedSize(await targetPartition.devicePath())) ?? used;
-    final dirty = await getDirtyWrite();
-    final completed = used - dirty;
-    double newPercent = completed / total;
+    double newPercent = used / total;
     if (newPercent > 1) {
       percent = 1;
     } else if (newPercent > percent) {
@@ -253,7 +254,7 @@ Stream<ResetMediaCreationProgress> copyAsyncJob(Partition resetPartition,
 Stream<ResetMediaCreationProgress> createResetMedia(
     String targetDevicePath) async* {
   var progress = ResetMediaCreationProgress(
-      ResetMediaCreationStatus.initializing, 0, null);
+      ResetMediaCreationStatus.initializing, null, null);
   yield progress;
 
   final tmpDir = Directory("/tmp").createTempSync("reset-media-");
@@ -277,12 +278,12 @@ Stream<ResetMediaCreationProgress> createResetMedia(
     if (r is double) {
       // copyPercentage
       progress =
-          ResetMediaCreationProgress(progress.status, r, progress.reason);
+          ResetMediaCreationProgress(progress.status, r, progress.errMsg);
       yield progress;
     } else if (r is ResetMediaCreationProgress) {
       // copyJob
       progress =
-          ResetMediaCreationProgress(r.status, progress.progress, r.reason);
+          ResetMediaCreationProgress(r.status, progress.percent, r.errMsg);
       yield progress;
       if (r.status == ResetMediaCreationStatus.finished ||
           r.status == ResetMediaCreationStatus.failed) {

@@ -269,43 +269,45 @@ class CreateResetMedia extends StatefulWidget {
 
 class _CreateResetMediaState extends State<CreateResetMedia> {
   Stream<ResetMediaCreationProgress>? createResetMediaAsyncStream;
-  String progressText = "";
-  double progressValue = 0;
+  var _progress = ResetMediaCreationProgress(
+      ResetMediaCreationStatus.initializing, null, null);
 
   onStatusChanged(ResetMediaCreationProgress progress) {
     setState(() {
-      progressText = progress.status.name;
-      progressValue = progress.progress!;
+      _progress = progress;
     });
   }
 
   @override
   initState() {
     super.initState();
-    createResetMediaAsyncStream ??= dummyCreateResetMedia(widget.devicePath);
+    createResetMediaAsyncStream ??= createResetMedia(widget.devicePath);
     createResetMediaAsyncStream!.listen(onStatusChanged);
   }
 
   @override
   Widget build(BuildContext context) {
+    List<Widget> mainWidgets = [
+      LinearProgressIndicator(value: _progress.percent),
+      Text(_progress.status.name),
+    ];
+
+    if (_progress.errMsg != null) {
+      mainWidgets.add(Text(_progress.errMsg!));
+    }
+
     return WizardPage(
         title: const YaruWindowTitleBar(title: Text("Factory Reset Tool")),
         header: const Text("Creating reset media..."),
         content: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            LinearProgressIndicator(value: progressValue),
-            Text(progressText),
-          ],
+          children: mainWidgets,
         ));
   }
 }
 
 Stream<ResetMediaCreationProgress> dummyCreateResetMedia(
     String targetDevicePath) async* {
-  yield ResetMediaCreationProgress(
-      ResetMediaCreationStatus.initializing, 0, null);
-
   await Future.delayed(const Duration(seconds: 3));
 
   for (double i = 0; i < 1; i += 0.01) {
