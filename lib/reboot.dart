@@ -61,6 +61,11 @@ final List<BootOption> defaultBootOption = [
       "Restore Ubuntu to factory state",
       "This option will restore Ubuntu to factory default, removing all files stored in this system during the process.",
       "Restore Ubuntu to factory state"),
+  GrubBootOption(
+      "fwsetup",
+      "UEFI Firmware Settings",
+      "Reboot into UEFI Firmware (BIOS) Settings menu",
+      "UEFI Firmware Settings"),
 ];
 
 List<BootOption> getResetOptions({String path = defaultFilePath}) {
