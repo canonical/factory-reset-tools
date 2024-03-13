@@ -5,13 +5,23 @@ description: |
   A tool to create reset media and reboot into factory reset menu, for Ubuntu-preinstalled systems.
 
 base: core22
-confinement: devmode
+confinement: strict
 grade: stable
 
 apps:
   factory-reset-tools:
     command: factory-reset-tools
     extensions: [gnome]
+    plugs:
+      - shutdown
+      - removable-media
+      - block-devices
+      - boot-grub
+      - reset-partition-fsuuid
+      - reset-yaml
+      - udisks2
+      - hardware-observe
+      - mount-observe
 
 parts:
   factory-reset-tools:
@@ -20,9 +30,18 @@ parts:
     flutter-target: lib/main.dart
     stage-packages:
       - rsync
+      - grub2-common
 
 plugs:
-  dbus-udisks2:
-    inteface: dbus
-    bus: system
-    name: org.freedesktop.UDisks2
+  boot-grub:
+    interface: system-files
+    write:
+    - /boot/grub
+  reset-partition-fsuuid:
+    interface: system-files
+    read:
+    - /etc/reset_partition_fsuuid
+  reset-yaml:
+    interface: system-files
+    read:
+    - /usr/share/desktop-provision/reset.yaml

@@ -287,6 +287,13 @@ class _CreateResetMediaState extends State<CreateResetMedia> {
 
   @override
   Widget build(BuildContext context) {
+    if (_progress.percent != null) {
+      List<Widget> mainWidgets = [
+        LinearProgressIndicator(value: _progress.percent),
+        Text("${_progress.percent}% ${_progress.status.name}"),
+      ];
+    }
+
     List<Widget> mainWidgets = [
       LinearProgressIndicator(value: _progress.percent),
       Text(_progress.status.name),

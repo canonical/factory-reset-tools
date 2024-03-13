@@ -1,3 +1,4 @@
+import 'package:dbus/dbus.dart';
 import 'package:yaml/yaml.dart';
 import 'dart:io';
 import 'dart:developer';
@@ -21,21 +22,21 @@ class GrubBootOption extends BootOption {
 
   @override
   Future<void> run() async {
-    List<String> params;
-    params = ["/usr/sbin/grub-reboot", optionName];
-
-    var result = await Process.run("/usr/bin/pkexec", params);
+    var result = await Process.run("grub-editenv",
+        ["/boot/grub/grubenv", "set", "next_entry=$optionName"]);
     stdout.write(result.stdout);
     stderr.write(result.stderr);
-    if (result.exitCode == 126) {
-      throw "unauthorized";
-    } else if (result.exitCode != 0) {
+    if (result.exitCode != 0) {
       throw result.stderr;
     }
 
-    result = await Process.run("/usr/bin/systemctl", ["reboot"]);
-    stdout.write(result.stdout);
-    stderr.write(result.stderr);
+    final dbusClient = DBusClient.system();
+
+    final loginObject = DBusRemoteObject(dbusClient,
+        name: 'org.freedesktop.login1',
+        path: DBusObjectPath('/org/freedesktop/login1'));
+    loginObject.callMethod(
+        "org.freedesktop.login1.Manager", "Reboot", [const DBusBoolean(true)]);
   }
 }
 
@@ -46,7 +47,7 @@ class RunCommandBootOption extends BootOption {
 
   @override
   Future<void> run() async {
-    var result = await Process.run("/usr/bin/pkexec", command);
+    var result = await Process.run("pkexec", command);
     stdout.write(result.stdout);
     stderr.write(result.stderr);
     if (result.exitCode == 126) {
