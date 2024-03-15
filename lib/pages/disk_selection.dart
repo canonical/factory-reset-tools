@@ -287,20 +287,12 @@ class _CreateResetMediaState extends State<CreateResetMedia> {
 
   @override
   Widget build(BuildContext context) {
+    String msgText = _progress.status.name;
     if (_progress.percent != null) {
-      List<Widget> mainWidgets = [
-        LinearProgressIndicator(value: _progress.percent),
-        Text("${_progress.percent}% ${_progress.status.name}"),
-      ];
+      msgText = "${_progress.percent}% $msgText";
     }
-
-    List<Widget> mainWidgets = [
-      LinearProgressIndicator(value: _progress.percent),
-      Text(_progress.status.name),
-    ];
-
     if (_progress.errMsg != null) {
-      mainWidgets.add(Text(_progress.errMsg!));
+      msgText = "${_progress.status.name} ${_progress.errMsg}";
     }
 
     return WizardPage(
@@ -308,7 +300,10 @@ class _CreateResetMediaState extends State<CreateResetMedia> {
         header: const Text("Creating reset media..."),
         content: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: mainWidgets,
+          children: [
+            LinearProgressIndicator(value: _progress.percent),
+            Text(msgText),
+          ],
         ));
   }
 }

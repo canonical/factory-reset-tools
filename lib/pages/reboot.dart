@@ -26,7 +26,7 @@ class _FactoryResetState extends State<FactoryReset> {
 
   doExecute(BuildContext context) async {
     try {
-      await startCommand(_selectedOption);
+      await startCommandViaDbus(_selectedOption);
     } catch (e) {
       if (!context.mounted) return;
       showDialog<String>(

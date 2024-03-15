@@ -1,7 +1,9 @@
 import 'package:dbus/dbus.dart';
+import 'package:retry/retry.dart';
 import 'package:yaml/yaml.dart';
 import 'dart:io';
 import 'dart:developer';
+import "dbus_remote_object.dart";
 
 const defaultFilePath = "/usr/share/desktop-provision/reset.yaml";
 
@@ -22,8 +24,11 @@ class GrubBootOption extends BootOption {
 
   @override
   Future<void> run() async {
-    var result = await Process.run("grub-editenv",
-        ["/boot/grub/grubenv", "set", "next_entry=$optionName"]);
+    var result = await Process.run("grub-editenv", [
+      "/var/lib/snapd/hostfs/boot/grub/grubenv",
+      "set",
+      "next_entry=$optionName"
+    ]);
     stdout.write(result.stdout);
     stderr.write(result.stderr);
     if (result.exitCode != 0) {
@@ -47,7 +52,7 @@ class RunCommandBootOption extends BootOption {
 
   @override
   Future<void> run() async {
-    var result = await Process.run("pkexec", command);
+    var result = await Process.run(command[0], command.sublist(1));
     stdout.write(result.stdout);
     stderr.write(result.stderr);
     if (result.exitCode == 126) {
@@ -110,9 +115,8 @@ List<BootOption> getResetOptions({String path = defaultFilePath}) {
 }
 
 Future<void> startCommand(String key, {String path = defaultFilePath}) {
-  List<BootOption> options;
   BootOption option;
-  options = getResetOptions(path: path);
+  final options = getResetOptions(path: path);
 
   try {
     option = options.firstWhere((option) => option.key == key);
@@ -121,4 +125,21 @@ Future<void> startCommand(String key, {String path = defaultFilePath}) {
   }
 
   return option.run();
+}
+
+Future<void> startCommandViaDbus(String key,
+    {String path = defaultFilePath}) async {
+  final dbusClient = DBusClient.system();
+  final object = ComCanonicalOemFactoryResetTools(
+      dbusClient, 'com.canonical.oem.FactoryResetTools');
+
+  // as service is activated by dbus call, we should try to rerun if dbus gives
+  // error
+  const retryRunner = RetryOptions(maxAttempts: 5);
+  await retryRunner.retry(
+    () => object.callReboot(key),
+    retryIf: (e) =>
+        e is DBusMethodResponseException &&
+        e.errorName == "org.freedesktop.DBus.Error.UnknownObject",
+  );
 }

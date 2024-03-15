@@ -159,10 +159,12 @@ class Partition {
   Partition(this.object);
 }
 
-Future<Partition> getResetPartition(
-    {fsuuidFilePath = fsuuidFilePathDefault}) async {
-  var targetFSUUID = await File(fsuuidFilePath).readAsString();
-  targetFSUUID = targetFSUUID.trim();
+Future<Partition> getResetPartition({String? fsuuid}) async {
+  String targetFSUUID = fsuuid ?? "";
+  if (fsuuid == null) {
+    var targetFSUUID = await File(fsuuidFilePathDefault).readAsString();
+    targetFSUUID = targetFSUUID.trim();
+  }
   var dbusClient = DBusClient.system();
 
   final blockDevicesObject = DBusRemoteObject(dbusClient,
@@ -252,8 +254,8 @@ Stream<ResetMediaCreationProgress> copyAsyncJob(Partition resetPartition,
       ResetMediaCreationStatus.finished, null, null);
 }
 
-Stream<ResetMediaCreationProgress> createResetMedia(
-    String targetDevicePath) async* {
+Stream<ResetMediaCreationProgress> createResetMedia(String targetDevicePath,
+    {String? fsuuid}) async* {
   var progress = ResetMediaCreationProgress(
       ResetMediaCreationStatus.initializing, null, null);
   yield progress;
@@ -262,7 +264,7 @@ Stream<ResetMediaCreationProgress> createResetMedia(
 
   tmpDir.deleteSync();
 
-  final resetPartition = await getResetPartition();
+  final resetPartition = await getResetPartition(fsuuid: fsuuid);
   final rpPath = await resetPartition.mount();
 
   final targetDrive = await Drive.fromDevicePath(targetDevicePath);

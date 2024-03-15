@@ -9,7 +9,6 @@ import 'package:ubuntu_localizations/ubuntu_localizations.dart';
 const int minimumRequiredDiskSize = 12 << 30;
 
 Future<void> main() async {
-  // TODO: add command line options for reboot and create USB drives
   await YaruWindowTitleBar.ensureInitialized();
 
   runApp(const MyApp());

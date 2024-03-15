@@ -16,27 +16,57 @@ apps:
       - shutdown
       - removable-media
       - block-devices
+      - reset-partition-fsuuid
+      - reset-yaml
+      - udisks2
+      - hardware-observe
+      - mount-observe
+      - dbus-client
+  cli:
+    command: factory-reset-tools-cli
+    plugs:
+      - shutdown
+      - removable-media
+      - block-devices
       - boot-grub
       - reset-partition-fsuuid
       - reset-yaml
       - udisks2
       - hardware-observe
       - mount-observe
+  dbus-daemon:
+    command: factory-reset-tools-cli dbus
+    daemon: simple
+    activates-on: [dbus-service]
+    plugs:
+      - shutdown
+      - boot-grub
+      - reset-yaml
 
 parts:
   factory-reset-tools:
     source: .
     plugin: flutter
     flutter-target: lib/main.dart
+    override-build: |
+      snapcraftctl build
+      dart compile exe -o factory-reset-tools-cli lib/cmdline.dart
+      cp factory-reset-tools-cli $CRAFT_PART_INSTALL/
     stage-packages:
       - rsync
       - grub2-common
+
+slots:
+  dbus-service:
+    interface: dbus
+    bus: system
+    name: com.canonical.oem.FactoryResetTools
 
 plugs:
   boot-grub:
     interface: system-files
     write:
-    - /boot/grub
+    - /var/lib/snapd/hostfs/boot/grub
   reset-partition-fsuuid:
     interface: system-files
     read:
@@ -45,3 +75,7 @@ plugs:
     interface: system-files
     read:
     - /usr/share/desktop-provision/reset.yaml
+  dbus-client:
+    interface: dbus
+    bus: system
+    name: com.canonical.oem.FactoryResetTools
