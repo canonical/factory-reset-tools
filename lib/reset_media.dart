@@ -162,7 +162,7 @@ class Partition {
 Future<Partition> getResetPartition({String? fsuuid}) async {
   String targetFSUUID = fsuuid ?? "";
   if (fsuuid == null) {
-    var targetFSUUID = await File(fsuuidFilePathDefault).readAsString();
+    targetFSUUID = await File(fsuuidFilePathDefault).readAsString();
     targetFSUUID = targetFSUUID.trim();
   }
   var dbusClient = DBusClient.system();

@@ -3,7 +3,7 @@ import 'package:yaru_widgets/yaru_widgets.dart';
 import 'package:ubuntu_wizard/ubuntu_wizard.dart';
 import '../reboot.dart';
 
-const defaultOptionKey = "default";
+const defaultOptionKey = "factory-reset";
 
 class FactoryReset extends StatefulWidget {
   const FactoryReset({super.key});

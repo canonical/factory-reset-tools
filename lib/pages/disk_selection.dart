@@ -289,7 +289,8 @@ class _CreateResetMediaState extends State<CreateResetMedia> {
   Widget build(BuildContext context) {
     String msgText = _progress.status.name;
     if (_progress.percent != null) {
-      msgText = "${_progress.percent}% $msgText";
+      msgText =
+          "${((_progress.percent ?? 0.0) * 100).toStringAsFixed(2)}% $msgText";
     }
     if (_progress.errMsg != null) {
       msgText = "${_progress.status.name} ${_progress.errMsg}";

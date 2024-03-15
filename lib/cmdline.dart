@@ -14,6 +14,17 @@ class CreateResetMediaCommand extends Command {
   final name = "create-reset-media";
   @override
   final description = "Create a reset media from reset partition";
+  @override
+  String get invocation {
+    var parents = [name];
+    for (var command = parent; command != null; command = command.parent) {
+      parents.add(command.name);
+    }
+    parents.add(runner!.executableName);
+
+    var invocation = parents.reversed.join(' ');
+    return '$invocation [arguments] disk-path';
+  }
 
   CreateResetMediaCommand() {
     argParser.addOption(
@@ -26,12 +37,20 @@ class CreateResetMediaCommand extends Command {
   @override
   void run() async {
     ArgResults argResults = this.argResults!;
-    String? fsuuid = argResults['fsuuid'];
-    await for (final status
-        in createResetMedia(argResults.rest[0], fsuuid: fsuuid)) {
-      stdout.writeln(
-          "${(status.percent ?? 0.0).toStringAsFixed(2)} ${status.status.toString()} ${status.errMsg ?? ""}");
+    String? fsuuid = argResults['rp-uuid'];
+    if (argResults.rest.isEmpty) {
+      printUsage();
+      throw Exception("missing disk path");
     }
+    await for (final progress
+        in createResetMedia(argResults.rest[0], fsuuid: fsuuid)) {
+      stdout.write(
+          "${((progress.percent ?? 0.0) * 100).toStringAsFixed(2)}% ${progress.status.name} ${progress.errMsg ?? ""}"
+              .padRight(75));
+      stdout.write("\r");
+    }
+    stdout.writeln();
+    exit(0);
   }
 }
 
@@ -40,17 +59,26 @@ class RebootCommand extends Command {
   final name = "reboot";
   @override
   final description =
-      "Reboot into reset partition, or any other preconfigured options";
+      "Reboot into reset partition, or any other preconfigured options.\n"
+      "If no option is given, a list of available options will be listed.";
+  @override
+  String get invocation {
+    var parents = [name];
+    for (var command = parent; command != null; command = command.parent) {
+      parents.add(command.name);
+    }
+    parents.add(runner!.executableName);
 
-  RebootCommand() {
-    argParser.addFlag("list",
-        abbr: "l", help: "List available reboot options", negatable: false);
+    var invocation = parents.reversed.join(' ');
+    return '$invocation [reboot-option]';
   }
+
+  RebootCommand() {}
 
   @override
   void run() {
     var argResults = this.argResults!;
-    if (argResults['list'] == true) {
+    if (argResults.rest.isEmpty) {
       List<BootOption> options = getResetOptions();
       stdout.writeln("List of available options:\n");
       for (BootOption option in options) {
@@ -63,6 +91,7 @@ class RebootCommand extends Command {
       return;
     }
     startCommand(argResults.rest[0]);
+    exit(0);
   }
 }
 

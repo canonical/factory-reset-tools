@@ -63,7 +63,7 @@ class RunCommandBootOption extends BootOption {
 
 final List<BootOption> defaultBootOption = [
   GrubBootOption(
-      "default",
+      "factory-reset",
       "Restore Ubuntu to factory state",
       "This option will restore Ubuntu to factory default, removing all files stored in this system during the process.",
       "Restore Ubuntu to factory state"),
