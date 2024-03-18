@@ -1,4 +1,4 @@
-import 'package:factory_reset_tools/pages/disk_selection.dart';
+import 'package:factory_reset_tools/pages/reset_media.dart';
 import 'package:factory_reset_tools/pages/reboot.dart';
 import 'package:flutter/material.dart';
 import 'package:yaru_widgets/yaru_widgets.dart';

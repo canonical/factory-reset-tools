@@ -116,7 +116,7 @@ class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
     }
 
     // finally we got a list of drives, find those who's ConnectionBus is "usb",
-    // or is MediaRemovable, since USB NVMe drives does not show MediaRemovable
+    // or is Removable, since USB NVMe drives does not show Removable
     List<Drive> drives = [];
     for (final entry in blockDevs.entries) {
       final blockDeviceObjectPath = entry.key;
@@ -127,11 +127,11 @@ class _SelectRemovableMediaState extends State<SelectRemovableMedia> {
       final connectionBus = await driveObject.getProperty(
           'org.freedesktop.UDisks2.Drive', 'ConnectionBus',
           signature: DBusSignature('s'));
-      final mediaRemovable = await driveObject.getProperty(
-          'org.freedesktop.UDisks2.Drive', 'MediaRemovable',
+      final isRemovable = await driveObject.getProperty(
+          'org.freedesktop.UDisks2.Drive', 'Removable',
           signature: DBusSignature('b'));
 
-      if (!(connectionBus.asString() == 'usb' || mediaRemovable.asBoolean())) {
+      if (!(connectionBus.asString() == 'usb' || isRemovable.asBoolean())) {
         continue;
       }
 
