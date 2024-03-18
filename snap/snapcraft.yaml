@@ -28,12 +28,12 @@ apps:
       - shutdown
       - removable-media
       - block-devices
-      - boot-grub
       - reset-partition-fsuuid
       - reset-yaml
       - udisks2
       - hardware-observe
       - mount-observe
+      - dbus-client
   dbus-daemon:
     command: factory-reset-tools-cli dbus
     daemon: simple

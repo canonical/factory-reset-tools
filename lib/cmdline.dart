@@ -90,7 +90,7 @@ class RebootCommand extends Command {
       }
       return;
     }
-    startCommand(argResults.rest[0]);
+    startCommandViaDbus(argResults.rest[0]);
     exit(0);
   }
 }
