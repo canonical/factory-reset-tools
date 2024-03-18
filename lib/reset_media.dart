@@ -156,6 +156,16 @@ class Partition {
     return _devicePath!;
   }
 
+  Future<String> getMountPoint() async {
+    final mp = await object.getProperty(
+        'org.freedesktop.UDisks2.Filesystem', 'MountPoints',
+        signature: DBusSignature('aay'));
+    final firstMPCString = mp.asArray().first.asByteArray();
+    final mountPoint =
+        String.fromCharCodes(firstMPCString.where((e) => e != 0), 0, 128);
+    return mountPoint;
+  }
+
   Partition(this.object);
 }
 
@@ -220,8 +230,9 @@ Stream<double> copyPercentageUpdate(
   }
 }
 
-Stream<ResetMediaCreationProgress> copyAsyncJob(Partition resetPartition,
-    targetPartition, String rpPath, targetPath) async* {
+Stream<ResetMediaCreationProgress> copyAsyncJob(
+    Partition resetPartition, targetPartition, String rpPath, targetPath,
+    {bool rpUnmount = true}) async* {
   yield ResetMediaCreationProgress(
       ResetMediaCreationStatus.copying, null, null);
 
@@ -243,7 +254,9 @@ Stream<ResetMediaCreationProgress> copyAsyncJob(Partition resetPartition,
         "failed to run script after media creation");
   }
   try {
-    await resetPartition.unmount();
+    if (rpUnmount) {
+      await resetPartition.unmount();
+    }
     await targetPartition.unmount();
   } catch (e) {
     yield ResetMediaCreationProgress(ResetMediaCreationStatus.failed, null,
@@ -265,15 +278,27 @@ Stream<ResetMediaCreationProgress> createResetMedia(String targetDevicePath,
   tmpDir.deleteSync();
 
   final resetPartition = await getResetPartition(fsuuid: fsuuid);
-  final rpPath = await resetPartition.mount();
+  String rpPath;
+  bool rpUnmount = true;
+  try {
+    rpPath = await resetPartition.mount();
+  } on DBusMethodResponseException catch (e) {
+    if (e.errorName == "org.freedesktop.UDisks2.Error.AlreadyMounted") {
+      rpUnmount = false;
+      rpPath = await resetPartition.getMountPoint();
+    } else {
+      rethrow;
+    }
+  }
 
   final targetDrive = await Drive.fromDevicePath(targetDevicePath);
   await targetDrive.unmountAndRemoveAll();
   final targetPartition = await targetDrive.format();
   final targetPath = await targetPartition.mount();
 
-  final copyJob =
-      copyAsyncJob(resetPartition, targetPartition, rpPath, targetPath);
+  final copyJob = copyAsyncJob(
+      resetPartition, targetPartition, rpPath, targetPath,
+      rpUnmount: rpUnmount);
   final copyPercentage = copyPercentageUpdate(resetPartition, targetPartition);
   final mergedStreams = StreamGroup.merge([copyJob, copyPercentage]);
 
