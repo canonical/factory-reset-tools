@@ -59,6 +59,8 @@ parts:
     stage-packages:
       - rsync
       - grub2-common
+    build-packages:
+      - curl
 
 slots:
   dbus-service:
