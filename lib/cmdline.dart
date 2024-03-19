@@ -76,7 +76,7 @@ class RebootCommand extends Command {
   RebootCommand() {}
 
   @override
-  void run() {
+  void run() async {
     var argResults = this.argResults!;
     if (argResults.rest.isEmpty) {
       List<BootOption> options = getResetOptions();
@@ -90,7 +90,7 @@ class RebootCommand extends Command {
       }
       return;
     }
-    startCommandViaDbus(argResults.rest[0]);
+    await startCommandViaDbus(argResults.rest[0]);
     exit(0);
   }
 }
