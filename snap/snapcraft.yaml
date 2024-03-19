@@ -8,6 +8,10 @@ base: core22
 confinement: strict
 grade: stable
 
+# for now, only build for amd64, since PC OEM does not have other architectures at the moment...
+architectures:
+- build-on: [amd64]
+
 apps:
   factory-reset-tools:
     command: factory-reset-tools
