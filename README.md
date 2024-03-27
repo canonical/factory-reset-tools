@@ -1,5 +1,1 @@
-# Factory Reset Tools
-
-TODO: To have a proper README
-
-License: GPLv3, see LICENSE fo license text
+Archived: This project has been merged into [ubuntu-desktop-provision](https://github.com/canonical/ubuntu-desktop-provision).
